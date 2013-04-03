@@ -3,11 +3,13 @@ Game.config = (function() {
     map: {
       width: 48,
       height: 32,
+      // width: 5,
+      // height: 5
     },
 
     tile: {
-      width: 8,
-      height: 8,
+      width: 16,
+      height: 16,
     },
   };
 

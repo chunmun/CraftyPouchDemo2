@@ -3,57 +3,19 @@
  * Loading Scene in the Game
  */
 Crafty.scene('Loading', function() {
+  console.log('Start Loading');
   var loadingText = Crafty.e("2D, DOM, Text")
       .attr({w: 500, h: 20, x: ((Crafty.viewport.width) / 2), y: (Crafty.viewport.height / 2), z: 2})
       .text('Loading ...')
       .textColor('#000')
       .textFont({'size' : '24px', 'family': 'Arial'});
 
+  // var assets = [];
 
-  var assets = [
-    'assets/16x16_forest_2.gif',
-    'assets/hunter.png',
-    'assets/door_knock_3x.mp3',
-    'assets/door_knock_3x.ogg',
-    'assets/door_knock_3x.aac',
-    'assets/board_room_applause.mp3',
-    'assets/board_room_applause.ogg',
-    'assets/board_room_applause.aac',
-    'assets/candy_dish_lid.mp3',
-    'assets/candy_dish_lid.ogg',
-    'assets/candy_dish_lid.aac'];
-
-  // Load our sprite map image
-  Crafty.load(assets, function() {
-    // Define the individual sprites in the image
-    // Each one (sprTree, etc) becomes a component
-    Crafty.sprite(16, 'assets/16x16_forest_1.gif', {
-      sprTree: [0,0],
-      sprBush: [1,0],
-      sprVillage: [0,1]
-    });
-
-    Crafty.sprite(16, 'assets/hunter.png', {
-      sprPlayer: [0,2]
-    }, 0, 2);
-
-    // Define out sounds for later use
-    Crafty.audio.add({
-      knock:     ['assets/door_knock_3x.mp3',
-                  'assets/door_knock_3x.ogg',
-                  'assets/door_knock_3x.aac'],
-      applause:  ['assets/board_room_applause.mp3',
-                  'assets/board_room_applause.ogg',
-                  'assets/board_room_applause.aac'],
-      ring:      ['assets/candy_dish_lid.mp3',
-                  'assets/candy_dish_lid.ogg',
-                  'assets/candy_dish_lid.aac']
-    });
-
-    console.log('Game Assets Loaded');
-    Crafty.scene('StartSplash');
-  });
-
+  // Crafty.load(assets, function() {
+  //   console.log('Game Assets Loaded');
+  // });
+  Crafty.scene('StartSplash');
 }, function() {
 
 });
@@ -64,23 +26,7 @@ Crafty.scene('Loading', function() {
  * Start Splash Scene
  */
 
-var blackout = function() {
-  Crafty.e('2D, Canvas, Color, Tween')
-    .attr({
-      x: 0,
-      y: 0,
-      w: Crafty.viewport.width,
-      h: Crafty.viewport.height,
-      alpha: 0.0,
-    })
-    .color('rgb(0,0,0)')
-    .tween({alpha:1.0},20)
-    .bind('TweenEnd', function() {
-      this.destroy();
-      Crafty.scene('StartMenu');
-    });
-}
-
+var blackFun;
 Crafty.scene('StartSplash', function() {
   var StartText = Crafty.e("2D, Canvas, Text")
       .attr({
@@ -95,10 +41,14 @@ Crafty.scene('StartSplash', function() {
       .textColor('rgb(0,0,0)')
       .textFont({'size' : '24px', 'family': 'Arial'});
 
-  Crafty.bind('KeyDown', blackout);
+  var blackout = Crafty.e('Blackout');
+  blackFun = function() {
+    Crafty.trigger('blackOut');
+  };
 
+  Crafty.bind('KeyDown', blackFun);
 }, function() {
-  Crafty.unbind('KeyDown', blackout);
+  Crafty.unbind('KeyDown', blackFun);
 });
 
 /**
@@ -108,7 +58,9 @@ Crafty.scene('StartSplash', function() {
 Crafty.scene('StartMenu', function() {
 
   // TODO: Implement Start menu
+  console.log('In StartMenu');
   Crafty.scene('GameMain');
+
 }, function() {
 
 });
@@ -117,163 +69,231 @@ Crafty.scene('StartMenu', function() {
 
 
 
-
-var player;
 var gameMap;
-var loadMap = function() {
-  if (gameMap === undefined) generateMap();
+var origMap;
+var stateMap;
+var nextMap;
 
+var loadStateMap = function() {
   for (var x = 0; x < Game.config.map.width; x++) {
     for (var y = 0; y < Game.config.map.height; y++) {
-      switch (gameMap[x][y]) {
-        case 1: // tree
-          Crafty.e('Tree').at(x,y);
-          break;
-
-        case 2:
-          Crafty.e('Bush').at(x,y)
-          break;
-
-        case 3:
-          Crafty.e('Village').at(x,y);
-          break;
+      switch (stateMap[x][y]) {
+        case 0:
+          gameMap[x][y].setMode(false);
+        break;
+        case 1:
+          gameMap[x][y].setMode(true);
+        break;
       }
     }
   }
+}
+
+// Clones from src to dest
+var cloneMap = function(src) {
+  var arr = [];
+  for (var i = 0; i < src.length; i++) {
+    arr[i] = src[i].slice(0);
+  }
+  return arr;
 }
 
 var generateMap = function() {
+  if (origMap !== undefined) return;
   // A 2D array to keep track of all occupied tiles
+  origMap = [];
   gameMap = [];
+  stateMap = [];
+  nextMap = [];
   for (var x = 0; x < Game.config.map.width; x++) {
+    origMap[x] = [];
     gameMap[x] = [];
+    stateMap[x] = [];
+    nextMap[x] = [];
     for (var y = 0; y < Game.config.map.height; y++) {
-      gameMap[x][y] = 0;
-    }
-  }
-
-  gameMap[Game.config.map.width/2][Game.config.map.height/2] = 4; // Player Reserved
-
-  // Place a tree at every edge square on our grid of 16x16 tiles
-  for (var x = 0; x < Game.config.map.width; x++) {
-    for (var y = 0; y < Game.config.map.height; y++) {
-      var at_edge = x == 0 || x == Game.config.map.width -1 ||
-                    y == 0 || y == Game.config.map.height - 1;
-
-      if (at_edge) {
-        gameMap[x][y] = 1; // Tree
-      } else if (Math.random() < 0.06 && gameMap[x][y] === 0) {
-        gameMap[x][y] = 2; // Bush
-      }
-    }
-  }
-
-  var maxVillages = 5;
-  for (var x = 1; x < Game.config.map.width - 1; x++) {
-    for (var y = 1; y < Game.config.map.height - 1; y++) {
-      if (Math.random() < 0.02 && gameMap[x][y] === 0 && maxVillages > 0) {
-        gameMap[x][y] = 3; // Villages
-        maxVillages--;
-      }
+      origMap[x][y] = 0;
+      stateMap[x][y] = 0;
+      nextMap[x][y] = 0;
+      gameMap[x][y] = Crafty.e('Tile').at(x,y).setMode(false);
     }
   }
 }
 
+var advanceState = function() {
+  for (var x = 0; x < Game.config.map.width; x++) {
+    for (var y = 0; y < Game.config.map.height; y++) {
+      var alive = getNeighboursAlive(x,y);
+      if(stateMap[x][y] === 1) {
+        if (alive === 3 || alive === 2) {
+          nextMap[x][y] = 1;
+        } else {
+          nextMap[x][y] = 0;
+        }
+      } else {
+        if (alive === 3) {
+          nextMap[x][y] = 1;
+        } else {
+          nextMap[x][y] = 0;
+        }
+      }
+    }
+  }
+  stateMap = cloneMap(nextMap);
+}
 
+var getNeighboursAlive = function(x, y) {
+  if (x == 0) {
+    if (y == 0) { // Top left
+      // console.log('top left');
+      return stateMap[x+1][y]+stateMap[x][y+1]+stateMap[x+1][y+1];
+    } else if (y == Game.config.map.height - 1) { // Bot left
+      // console.log('bot left');
+      return stateMap[x+1][y]+stateMap[x][y-1]+stateMap[x+1][y-1];
+    } else { // Left
+      // console.log('left');
+      return stateMap[x][y-1]+stateMap[x+1][y-1]+
+             stateMap[x+1][y]+
+             stateMap[x][y+1]+stateMap[x+1][y+1];
+    }
+  } else if (x == Game.config.map.width - 1) {
+    if (y == 0) { // Top Right
+      // console.log('top right');
+      return stateMap[x-1][y]+stateMap[x][y+1]+stateMap[x-1][y+1];
+    } else if (y == Game.config.map.height - 1) { // Bot Right
+      // console.log('bot right');
+      return stateMap[x-1][y]+stateMap[x][y-1]+stateMap[x-1][y-1];
+    } else { // Right
+      // console.log('right');
+      return stateMap[x-1][y-1]+stateMap[x][y-1]+
+             stateMap[x-1][y]+
+             stateMap[x-1][y+1]+stateMap[x][y+1];
+    }
+  } else {
+    if (y == 0) { //Top
+      // console.log('top');
+      return stateMap[x-1][y]+stateMap[x+1][y]+
+             stateMap[x-1][y+1]+stateMap[x][y+1]+stateMap[x+1][y+1];
+    } else if (y == Game.config.map.height - 1) { // Bot
+      // console.log('bot');
+      return stateMap[x-1][y-1]+stateMap[x][y-1]+stateMap[x+1][y-1]+
+             stateMap[x-1][y]+stateMap[x+1][y];
+    } else {  // Inner tiles
+      // console.log('inner');
+      return stateMap[x-1][y-1]+stateMap[x][y-1]+stateMap[x+1][y-1]+
+             stateMap[x-1][y]+stateMap[x+1][y]+
+             stateMap[x-1][y+1]+stateMap[x][y+1]+stateMap[x+1][y+1];
+    }
+  }
+}
 
 /**
  * The actual game scene
  */
 Crafty.scene('GameMain', function() {
-  // TODO: Implement Viewport
-  // TODO: Implement TiledMaps
-  loadMap();
+  var modes = {RUNNING:'RUNNING', SAVING:'SAVING'};
+  var currMode = modes.RUNNING;
+  generateMap();
+  loadStateMap();
 
-  // Player Character, placed at center on the grid
-  player = Crafty.e('PlayerCharacter')
-    .at(Game.config.map.width/2, Game.config.map.height/2);
+  Crafty.background('rgb(100,100,100)');
+  var stepGameMap = function() {
+    advanceState();
+    loadStateMap();
+  }
 
-  this.showVictory = this.bind('VillageVisited', function(e) {
-    gameMap[e.at().x][e.at().y] = 0;
-    if (Crafty('Village').length == 0) {
-      Crafty.scene('Victory');
+  this.bind('tileClick', function(pos) {
+    // console.log('clicking at '+pos.x+','+pos.y+' to set '+pos.mode);
+    stateMap[pos.x][pos.y] = (pos.mode ? 1 : 0);
+  })
+
+  // this.controller = Crafty.e('Controller');
+  this._enterFrame = this.bind('EnterFrame', function() {
+    if (Crafty.keydown[Crafty.keys['SPACE']]) {
+      stepGameMap();
     }
   });
 
-  var gameMenu = Crafty.e('Menu');
-  var isMenuMode = false;
-  var menuBtn = Crafty.e('MenuButton');
+  var saveBox = Crafty.e('Box, SaveMenuBindings');
+  var saveText = Crafty.e('Textfield, SaveMenuBindings');
+
+  var loadBox = Crafty.e('Box, LoadMenuBindings');
+  var loadText = Crafty.e('Textfield, LoadMenuBindings');
 
   this.saveLoad = this.bind('KeyDown', function(e) {
     var _this = this;
-    if (e.keyCode == 79) { // 'o'
-      // Save the player
-      Crafty.storage.save('player','save',player);
-      // Save the map
-      Crafty.storage.save('map','save',gameMap);
+    if (currMode === modes.RUNNING) {
+      switch (e.keyCode) {
+        case 79: // 'o'
+          // Save the map
+          Crafty.storage.save('map', 'save', stateMap);
+          break;
+        case 80: // 'p'
+          var _this = this;
+          // Load the map
+          Crafty.storage.load('map', 'save', function(data) {
+            stateMap = cloneMap(data);
+            origMap = cloneMap(data);
+            loadStateMap();
+          });
+          break;
+        case 77: // 'm'
+          break;
+        case Crafty.keys['RIGHT_ARROW']:
+        case 32: // 'Space'
+          stepGameMap();
+          break;
+        case 82: // 'r'
+          stateMap = cloneMap(origMap);
+          loadStateMap();
+          break;
 
-    } else if (e.keyCode == 80) { // 'p'
+        // Saving mode
+        case Crafty.keys['K']:
+          Crafty.trigger('closeLoad');
+          currMode = modes.SAVING;
+          Crafty.storage.getAllKeys('save', function(keys) {
+            Crafty.trigger('viewSave');
+          });
+          break;
 
-      // Load the player
-      Crafty.storage.load('player','save',function(data) {
-        data._globalZ = player.globalZ;
-        player.destroy();
-        player = data;
-      });
+        // Loading mode
+        case Crafty.keys['L']:
+          Crafty.trigger('closeSave');
+          currMode = modes.LOADING;
+          Crafty.storage.getAllKeys('save', function(keys) {
+            Crafty.trigger('viewLoad');
+          });
+          break;
+      }
+    }
 
-      // Load the map
-      Crafty.storage.load('map','save',function(data) {
-        Crafty('Tree').destroy();
-        Crafty('Bush').destroy();
-        Crafty('Village').destroy();
-        gameMap = data;
-        loadMap();
-      });
+    switch (e.keyCode) {
 
-    } else if (e.keyCode == 77) {
-      isMenuMode = !isMenuMode;
-      Crafty.trigger('toggleMenu', isMenuMode);
-      Crafty.trigger('freezePlayer', isMenuMode);
+      case Crafty.keys['ESC']:
+        currMode = modes.RUNNING;
+        Crafty.trigger('closeSave');
+        Crafty.trigger('closeLoad');
+        break;
+
+      case Crafty.keys['ENTER']:
+        if(currMode === modes.SAVING) {
+          Crafty.trigger('closeSave');
+          currMode = modes.RUNNING;
+          loadStateMap();
+          Crafty.storage.save(saveText.getWord(), 'save', stateMap);
+        } else if (currMode === modes.LOADING) {
+          Crafty.trigger('closeLoad');
+          Crafty.storage.load(loadText.getWord(), 'save', function(data) {
+            stateMap = cloneMap(data);
+            origMap = cloneMap(data);
+            loadStateMap();
+            currMode = modes.RUNNING;
+          });
+        }
+        break;
     }
   });
 
   console.log('Game Scene done');
 }, function() {
-  this.unbind('KeyDown', this.saveLoad);
-  this.unbind('VillageVisited', this.showVictory);
 });
-
-
-Crafty.scene('Victory', function() {
-  console.log('Victory Scene');
-  var EndingText = Crafty.e("2D, Canvas, Text")
-      .attr({w: 500, h: 30, x: ((Crafty.viewport.width) / 3), y: (Crafty.viewport.height / 2), z: 2})
-      .text('Victory')
-      .textColor('#000')
-      .textFont({'size' : '164px', 'family': 'Arial'});
-
-  var RestartText = Crafty.e("2D, Canvas, Text")
-      .attr({w: 500, h: 20, x: ((Crafty.viewport.width) / 3) - 70, y: (Crafty.viewport.height / 2) + 40, z: 2})
-      .text('Press any key to restart')
-      .textColor('#000')
-      .textFont({'size' : '32px', 'family': 'Arial'});
-
-  // Give'em a round of applause!
-  Crafty.audio.play('applause');
-
-  // After a short delay, watch for the player to press a key, then restart
-  // the game when a key is pressed
-  var delay = true;
-  setTimeout(function() { delay = false; }, 1000);
-
-  this.restart_game = Crafty.bind('KeyDown', function() {
-    if (!delay) {
-      generateMap();
-      Crafty.scene('GameMain');
-    }
-  });
-
-}, function() {
-  this.unbind('KeyDown', this.restart_game);
-});
-

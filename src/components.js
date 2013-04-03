@@ -23,6 +23,196 @@ Crafty.c('MenuButton', {
   },
 });
 
+Crafty.c('Tile', {
+  init: function() {
+    this.onColor = 'rgb(255,255,0)';
+    this.offColor = 'rgb(0,0,0)';
+    this.isOn = false;
+
+    this.requires('2D, Canvas, Color, Grid, Tween, Mouse')
+      .color(this.offColor)
+      .bind('Click', function() {
+        this.setMode(!this.isOn);
+        var pos = this.at();
+        pos.mode = this.isOn;
+        Crafty.trigger('tileClick', pos);
+      })
+      .bind('MouseOver', function(m) {
+        if (m.button !== 2) {
+          // console.log(m);
+        }
+      });
+  },
+
+  setMode: function(isOn) {
+    this.isOn = isOn;
+    if (this.isOn) {
+      this.color(this.onColor);
+    } else {
+      this.color(this.offColor);
+    }
+    return this;
+  },
+
+  getStatus: function() {
+    return this.isOn;
+  }
+});
+
+Crafty.c('Textfield', {
+  init: function() {
+    this._word = '';
+    this._limit = 10;
+
+    this.bind('KeyDown', function(e) {
+          if(this.isOn) {
+            if(e.keyCode >= 48 && e.keyCode <= 90) { //Alphanumeric keys
+              for(var i in Crafty.keys) {
+                if (Crafty.keys[i] === e.keyCode) {
+                  this._word += i
+                  this.drawWord();
+                  break;
+                }
+              }
+            } else if (e.keyCode === Crafty.keys['BACKSPACE']) {
+              this._word = this._word.slice(0,-1);
+              this.drawWord();
+            }
+          }
+        })
+        .bind('viewSave', function() {
+          this._word=''
+          this.drawWord();
+        })
+        .bind('closeSave', function() {
+          this.destroyWord();
+        })
+        .bind('viewLoad', function() {
+          this._word=''
+          this.drawWord();
+        })
+        .bind('closeLoad', function() {
+          this.destroyWord();
+        });
+
+    this.drawWord();
+  },
+
+  limit: function(limit) {
+    this._limit = limit;
+  },
+
+  setWord: function(word) {
+    this._word = word;
+    this.drawWord();
+  },
+
+  getWord: function(word) {
+    return this._word;
+  },
+
+  drawWord: function() {
+    this.destroyWord();
+    var shown = 0;
+    if (this._word.length > this._limit) {
+      shown = this._word.length - this._limit;
+    }
+
+    this._txt = Crafty.e('2D, Canvas, Text')
+                      .text(this._word.slice(shown))
+                      .textColor('#FFFFFF',1)
+                      .textFont({'size' : '24px', 'family': 'Arial'});
+
+    this._txt.attr({x: Game.config.canvasWidth/2,
+                    y: Game.config.canvasHeight/2 - 22,
+                    w: this._word.length * 24,
+                    h: 24
+                    });
+    console.log(this._txt);
+  },
+
+  destroyWord: function() {
+    if (this._txt !== undefined) {
+      this._txt.destroy();
+    }
+  }
+})
+
+Crafty.c('SaveMenuBindings', {
+  init: function() {
+    this.isOn = false;
+    this.requires('Tween')
+        .bind('viewSave', function() {
+          this.isOn = true;
+          this.tween({alpha:1},5);
+          console.log('Viewing');
+        })
+        .bind('closeSave', function() {
+          this.isOn = false
+          this.tween({alpha:0},5);
+        });
+  },
+  }
+);
+
+Crafty.c('LoadMenuBindings', {
+  init: function() {
+    this.isOn = false;
+    this.requires('Tween')
+        .bind('viewLoad', function() {
+          this.tween({alpha:1},5);
+          this.isOn = true;
+        })
+        .bind('closeLoad', function() {
+          this.isOn = false
+          this.tween({alpha:0},5);
+        });
+  },
+  }
+);
+
+
+Crafty.c('Box', {
+  init: function() {
+    this.requires('2D, Canvas, Color, SaveMenuBindings')
+        .attr({
+          x: 0,
+          y: Game.config.canvasHeight/2-20,
+          w: Game.config.canvasWidth,
+          h: 25,
+          alpha: 0
+        })
+        .color('rgb(100,100,0)');
+  },
+});
+
+Crafty.c('Controller', {
+  init: function() {
+    this.requires('Keyboard');
+  }
+})
+
+Crafty.c('Blackout', {
+  init: function() {
+    this.requires('2D, Canvas, Color, Tween')
+      .attr({
+        x: 0,
+        y: 0,
+        w: Crafty.viewport.width,
+        h: Crafty.viewport.height,
+        alpha: 0.0,
+      })
+      .color('rgb(0,0,0)')
+      .bind('blackOut', function() {
+        this.tween({alpha:1.0},20)
+            .bind('TweenEnd', function() {
+              this.destroy();
+              Crafty.scene('StartMenu');
+            });
+      });
+  },
+});
+
 Crafty.c('Menu', {
   init: function() {
     this.requires('2D, Canvas, Color, Tween')
@@ -59,8 +249,8 @@ Crafty.c('Menu', {
 Crafty.c('Grid', {
   init: function() {
     this.attr({
-      w: Game.config.tile.width,
-      h: Game.config.tile.height
+      w: Game.config.tile.width - 1,
+      h: Game.config.tile.height - 1
     });
   },
 
@@ -81,108 +271,8 @@ Crafty.c('Grid', {
   }
 });
 
-// This is the player-controlled character
-Crafty.c('PlayerCharacter', {
-  init: function() {
-    console.log('Inside Player init');
-    this.requires('Actor, Fourway, Collision, sprPlayer, SpriteAnimation')
-      .fourway(2)
-      .onHit('Village', this.visitVillage)
-      .animate('PlayerMovingUp', 0,0,2)
-      .animate('PlayerMovingRight', 0,1,2)
-      .animate('PlayerMovingDown', 0,2,2)
-      .animate('PlayerMovingLeft', 0,3,2);
-
-      /*
-       * These next lines define our four animations
-       * each call to .animate specifies:
-       * - the name of the animation
-       * - the x and y coordinates within the sprite
-       *   map at which the animation set begins
-       * - the number of animation frames 'in addition' to the first one
-       */
-
-    // Bind Save and load events
-    this.bind('SaveData', function(data) {
-      // Need to overwrite all the components with this super component
-      data.c = ["PlayerCharacter"];
-      data.x = this.x;
-      data.y = this.y;
-    }).bind('LoadData', function(data) {
-      this.x = data.x;
-      this.y = data.y;
-    }).bind('freezePlayer', function(onMenu) {
-      if(onMenu) {
-        this.fourway(0);
-      } else {
-        this.fourway(2);
-      }
-    });
-
-    console.log('In da dumps');
-
-
-    // Watch for a change in direction and switch animation accordingly
-    var animationSpeed = 0;
-    this.bind('NewDirection', function(data) {
-      if (data.x > 0) {
-        this.animate('PlayerMovingRight', animationSpeed, -1);
-      } else if (data.x < 0) {
-        this.animate('PlayerMovingLeft', animationSpeed, -1);
-      } else if (data.y < 0) {
-        this.animate('PlayerMovingUp', animationSpeed, -1);
-      } else if (data.y > 0) {
-        this.animate('PlayerMovingDown', animationSpeed, -1);
-      } else {
-        this.stop();
-      }
-    })
-    // Stops when player hits a solid
-    .bind('Moved', function(from) {
-      if(this.hit('Solid')) {
-        this.attr({
-          x: from.x,
-          y: from.y
-        });
-      }
-    });
-  },
-
-  visitVillage: function(data) {
-    village = data[0].obj;
-    village.collect();
-  }
-
-});
-
-// A village is a tile on the grid that the PC must visit in order
-// to win the game
-Crafty.c('Village', {
-  init: function() {
-    this.requires('Actor, sprVillage');
-  },
-
-  collect: function() {
-    this.destroy();
-    Crafty.audio.play('knock');
-    Crafty.trigger('VillageVisited', this);
-  }
-});
-
 Crafty.c('Actor', {
   init: function() {
     this.requires('2D, Canvas, Grid')
   }
 })
-
-Crafty.c('Tree', {
-  init: function() {
-    this.requires('Actor, Solid, sprTree');
-  },
-});
-
-Crafty.c('Bush', {
-  init: function() {
-    this.requires('Actor, Solid, sprBush');
-  }
-});
